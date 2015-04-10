@@ -7,25 +7,36 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
 import javax.persistence.TypedQuery;
 
+import model.Log;
 import model.Person;
+
 import comunication.ManagerFactorySingleton;
+
+import controler.BusinessException;
+import controler.LogController;
 
 public class PersonDao {
 
 	private EntityManagerFactory factory = ManagerFactorySingleton
 			.getInstance();
 
-	public void insert(Person person) {
+	public void insert(Person person) throws BusinessException {
 		EntityManager manager = factory.createEntityManager();
 		EntityTransaction trx = manager.getTransaction();
 
-		trx.begin();
+		try {
+			trx.begin();
 
-		manager.persist(person);
+			manager.persist(person);
 
-		trx.commit();
+			trx.commit();
 
-		manager.close();
+		} catch (Exception e) {
+			throw new BusinessException("ERRO: Não foi possível realizar o cadastro! Tente novamente.");
+		} finally {
+			manager.close();
+		}
+
 	}
 
 	public void update(Person person) {
@@ -44,8 +55,17 @@ public class PersonDao {
 	public void delete(Person person) {
 		EntityManager manager = factory.createEntityManager();
 		EntityTransaction trx = manager.getTransaction();
+		
+		LogController controllerLog = new LogController();
 
 		trx.begin();
+		
+		List<Log> logs = controllerLog.search(person.getuId());
+		
+		for(Log log: logs){
+			controllerLog.delete(log);
+		}
+		
 		Person personRemoved = manager.find(Person.class, person.getId());
 		manager.remove(personRemoved);
 
@@ -92,11 +112,11 @@ public class PersonDao {
 	}
 
 	public List<Person> search(Person person) {
-		
+
 		EntityManager manager = factory.createEntityManager();
 		EntityTransaction trx = manager.getTransaction();
 		trx.begin();
-		
+
 		StringBuilder predicate = new StringBuilder("1 = 1");
 		if (person.getuId() != null && person.getuId().length() > 1) {
 			predicate.append(" and person.uId = :userId");

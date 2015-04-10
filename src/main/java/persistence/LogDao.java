@@ -57,5 +57,18 @@ private EntityManagerFactory factory = ManagerFactorySingleton.getInstance();
 			return result;
 		}
 	}
+	
+	public void delete(Log log) {
+		EntityManager manager = factory.createEntityManager();
+		EntityTransaction trx = manager.getTransaction();
+
+		trx.begin();
+		Log logRemoved = manager.find(Log.class, log.getId());
+		manager.remove(logRemoved);
+
+		trx.commit();
+
+		manager.close();
+	}
 
 }

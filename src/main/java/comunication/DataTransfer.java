@@ -10,15 +10,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Date;
-
-import javax.swing.JOptionPane;
+import java.util.TooManyListenersException;
 
 import model.Log;
 import model.Person;
 import controler.LogController;
 import controler.PersonController;
 
-public class DataTransfer implements Runnable, SerialPortEventListener {
+public class DataTransfer implements Runnable, SerialPortEventListener,
+		java.util.EventListener {
 
 	private InputStream input;
 	private OutputStream output;
@@ -28,9 +28,24 @@ public class DataTransfer implements Runnable, SerialPortEventListener {
 	private boolean enableWriting = false;
 	private String uidRead;
 	private boolean point = true;
+	private boolean active = false;
 
 	public DataTransfer(SerialPort port) {
 		this.port = port;
+		try {
+			port.addEventListener(this);
+			port.notifyOnDataAvailable(true);
+		} catch (TooManyListenersException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public boolean isActive() {
+		return active;
+	}
+
+	public void setActive(boolean active) {
+		this.active = active;
 	}
 
 	public void setPoint(boolean point) {
@@ -48,23 +63,28 @@ public class DataTransfer implements Runnable, SerialPortEventListener {
 	public void enableWriting(String msg) {
 		this.enableWriting = true;
 		this.enableRead = false;
-		// port.removeEventListener();
+		// port.notifyOnDataAvailable(true);
 		writePort(msg);
 	}
 
 	public void enableReading() {
 		this.enableWriting = false;
 		this.enableRead = true;
-		port.removeEventListener();
+		this.active = true;
 		readPort();
 	}
 
+	public void disableReadingWriting() {
+		this.enableWriting = false;
+		this.enableRead = false;
+		this.uidRead = null;
+		this.active = false;
+	}
+
 	private void writePort(String msg) {
-		if (enableWriting) {
-			System.out.println("teste1");
+		if (enableWriting || point) {
 			try {
 				output = port.getOutputStream();
-				// port.addEventListener(this);
 			} catch (Exception e) {
 				System.err.println("[" + new Date()
 						+ "] Erro no fluxo de saída. ");
@@ -91,8 +111,6 @@ public class DataTransfer implements Runnable, SerialPortEventListener {
 
 			try {
 				input = port.getInputStream();
-				port.addEventListener(this);
-				port.notifyOnDataAvailable(true);
 				System.out.println("[" + new Date()
 						+ "] Leitura da porta serial habilida.");
 				threadRead = new Thread(this);
@@ -104,82 +122,86 @@ public class DataTransfer implements Runnable, SerialPortEventListener {
 	}
 
 	public void serialEvent(SerialPortEvent ev) {
-		StringBuffer bufferRead = new StringBuffer();
-		System.out.println("[" + new Date()
-				+ "] Ocorreu um evento na porta serial.");
-		int newData = 0;
-
-		switch (ev.getEventType()) {
-
-		case SerialPortEvent.BI:
-		case SerialPortEvent.OE:
-		case SerialPortEvent.FE:
-		case SerialPortEvent.PE:
-		case SerialPortEvent.CD:
-		case SerialPortEvent.CTS:
-		case SerialPortEvent.DSR:
-		case SerialPortEvent.RI:
-		case SerialPortEvent.OUTPUT_BUFFER_EMPTY:
-			break;
-		case SerialPortEvent.DATA_AVAILABLE:
-			while (newData != -1) {
-
-				try {
-					newData = input.read();
-					if (newData == -1) {
-						break;
-					}
-					if ('\r' == (char) newData) {
-						bufferRead.append('\n');
-					} else {
-						bufferRead.append((char) newData);
-					}
-				} catch (IOException ioe) {
-					System.out.println("Erro de leitura serial: " + ioe);
-				}
-			}
+		
+			StringBuffer bufferRead = new StringBuffer();
 			System.out.println("[" + new Date()
-					+ "] Recebeu dados na pota serial.");
+					+ "] Ocorreu um evento na porta serial.");
+			int newData = 0;
 
-			this.uidRead = new String(bufferRead);
-			if (point) {
-				PersonController personController = new PersonController();
-				Person person = new Person();
-				person.setuId(this.uidRead);
-				this.uidRead = null;
-				person = personController.find(person);
-				if (person != null) {
-					LogController logController = new LogController();
-					Log log = new Log();
-					log.setUid(person.getuId());
-					logController.insert(log);
-					enableWriting(person.getName());
-								
-					MainScreen.lblPonto.setText(person.getName()
-							+ " bateu o ponto.");
-					MainScreen.lblPonto.setForeground(Color.GREEN);
-					Date now = new Date();
-					while (true) {
-						if (new Date().getSeconds() - now.getSeconds() == 3) {
+			switch (ev.getEventType()) {
+
+			case SerialPortEvent.BI:
+			case SerialPortEvent.OE:
+			case SerialPortEvent.FE:
+			case SerialPortEvent.PE:
+			case SerialPortEvent.CD:
+			case SerialPortEvent.CTS:
+			case SerialPortEvent.DSR:
+			case SerialPortEvent.RI:
+			case SerialPortEvent.OUTPUT_BUFFER_EMPTY:
+				break;
+			case SerialPortEvent.DATA_AVAILABLE:
+				while (newData != -1) {
+
+					try {
+						newData = input.read();
+						if (newData == -1) {
 							break;
 						}
-					}
-					MainScreen.lblPonto.setText("");
-
-				} else {
-					MainScreen.lblPonto.setText("Cartão não está cadastrado.");
-					MainScreen.lblPonto.setForeground(Color.RED);
-					Date now = new Date();
-					while (true) {
-						if (new Date().getSeconds() - now.getSeconds() == 3) {
-							break;
+						if ('\r' == (char) newData) {
+							bufferRead.append('\n');
+						} else {
+							bufferRead.append((char) newData);
 						}
+					} catch (IOException ioe) {
+						System.out.println("Erro de leitura serial: " + ioe);
 					}
-					MainScreen.lblPonto.setText("");
 				}
-			}
+				System.out.println("[" + new Date()
+						+ "] Recebeu dados na pota serial.");
+				if (active) {
+					this.uidRead = new String(bufferRead);
+				}
+				if (point) {
+					PersonController personController = new PersonController();
+					Person person = new Person();
+					person.setuId(this.uidRead);
+					this.uidRead = null;
+					person = personController.find(person);
+					if (person != null) {
+						LogController logController = new LogController();
+						Log log = new Log();
+						log.setUid(person.getuId());
+						logController.insert(log);
+						writePort(person.getName());
 
-		}
+						MainScreen.lblPonto.setText(person.getName()
+								+ " bateu o ponto.");
+						MainScreen.lblPonto.setForeground(Color.GREEN);
+						Date now = new Date();
+						while (true) {
+							if (new Date().getSeconds() - now.getSeconds() == 3) {
+								break;
+							}
+						}
+						MainScreen.lblPonto.setText("");
+
+					} else {
+						MainScreen.lblPonto
+								.setText("Cartão não está cadastrado.");
+						MainScreen.lblPonto.setForeground(Color.RED);
+						Date now = new Date();
+						while (true) {
+							if (new Date().getSeconds() - now.getSeconds() == 3) {
+								break;
+							}
+						}
+						MainScreen.lblPonto.setText("");
+					}
+				}
+
+			}
+		
 
 	}
 

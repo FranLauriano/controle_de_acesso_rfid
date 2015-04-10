@@ -24,4 +24,8 @@ public class LogController {
 		return dao.search(uid);
 	}
 
+	public void delete(Log log){
+		dao.delete(log);
+	}
+	
 }

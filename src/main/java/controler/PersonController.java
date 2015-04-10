@@ -22,6 +22,7 @@ public class PersonController {
 			throw new BusinessException("Uid já está cadastrado.");
 		}
 		dao.insert(person);
+		
 	}
 
 	public void update(Person person) {

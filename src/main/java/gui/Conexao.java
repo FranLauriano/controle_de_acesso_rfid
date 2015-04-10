@@ -4,6 +4,9 @@ import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.EntityTransaction;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -11,12 +14,15 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 
+import comunication.ManagerFactorySingleton;
 import comunication.SerialComm;
 
 public class Conexao {
 
 	private JFrame frmAbrirConexo;
 	protected static SerialComm serial;
+	private static EntityManagerFactory factory = ManagerFactorySingleton
+			.getInstance();
 
 	/**
 	 * Launch the application.
@@ -25,6 +31,7 @@ public class Conexao {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
+					EntityManager manager = factory.createEntityManager();
 					Conexao window = new Conexao();
 					window.frmAbrirConexo.setVisible(true);
 				} catch (Exception e) {
